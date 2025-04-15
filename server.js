@@ -14,71 +14,106 @@ app.use(bodyParser.json());
 const dataFile = path.join(__dirname, 'data.json');
 const userFile = path.join(__dirname, 'user.json');
 
-// Initialize files if not present
+// Initialize files if not exist
 if (!fs.existsSync(dataFile)) fs.writeFileSync(dataFile, JSON.stringify([]));
 if (!fs.existsSync(userFile)) fs.writeFileSync(userFile, JSON.stringify(null));
 
-// ✅ POST /data — Save sensor data
+
+// ✅ POST /data — Store new sensor data
 app.post('/data', (req, res) => {
   const newData = req.body;
   newData.timestamp = new Date();
 
   const raw = fs.readFileSync(dataFile);
   const data = JSON.parse(raw);
-  data.push(newData);
 
+  data.push(newData);
   fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+
   console.log('📥 Sensor data saved:', newData);
 
-  res.status(200).json({ message: 'Data stored' });
+  res.status(200).json({
+    success: true,
+    message: 'Sensor data saved successfully.'
+  });
 });
 
-// ✅ GET /data/latest — Get the most recent entry
+
+// ✅ GET /data/latest — Get most recent sensor data
 app.get('/data/latest', (req, res) => {
   const raw = fs.readFileSync(dataFile);
   const data = JSON.parse(raw);
 
   if (data.length === 0) {
-    return res.status(404).json({ message: 'No data available' });
+    return res.status(404).json({
+      success: false,
+      message: 'No sensor data available.'
+    });
   }
 
-  res.json(data[data.length - 1]);
+  res.json({
+    success: true,
+    data: data[data.length - 1]
+  });
 });
 
-// ✅ GET /data/history — Get all saved sensor data
+
+// ✅ GET /data/history — Get all sensor data
 app.get('/data/history', (req, res) => {
   const raw = fs.readFileSync(dataFile);
   const data = JSON.parse(raw);
-  res.json(data);
+
+  res.json({
+    success: true,
+    data: data
+  });
 });
+
 
 // ✅ POST /user — Save or update user profile
 app.post('/user', (req, res) => {
   fs.writeFileSync(userFile, JSON.stringify(req.body, null, 2));
   console.log('👤 User profile updated:', req.body);
-  res.status(200).json({ message: 'User profile saved' });
+
+  res.status(200).json({
+    success: true,
+    message: 'User profile saved successfully.'
+  });
 });
 
-// ✅ GET /user — Retrieve user profile
+
+// ✅ GET /user — Fetch user profile
 app.get('/user', (req, res) => {
   const raw = fs.readFileSync(userFile);
   const user = JSON.parse(raw);
 
   if (!user) {
-    return res.status(404).json({ message: 'No user profile' });
+    return res.status(404).json({
+      success: false,
+      message: 'No user profile found.'
+    });
   }
 
-  res.json(user);
+  res.json({
+    success: true,
+    data: user
+  });
 });
+
 
 // ✅ POST /user/reset — Clear user profile
 app.post('/user/reset', (req, res) => {
   fs.writeFileSync(userFile, JSON.stringify(null));
-  console.log('🔁 User profile has been reset.');
-  res.status(200).json({ message: 'User profile reset' });
+  console.log('🔁 User profile reset.');
+
+  res.status(200).json({
+    success: true,
+    message: 'User profile reset successfully.'
+  });
 });
 
-// 🚀 Start server
+
+// 🚀 Run Server
 app.listen(PORT, () => {
-  console.log(`✅ PPG Backend is live at http://localhost:${PORT}`);
+  console.log(`✅ PPG Backend running at http://localhost:${PORT}`);
 });
