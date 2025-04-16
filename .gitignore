@@ -1,0 +1,8 @@
+# .gitignore
+node_modules/
+.venv/
+.env
+__pycache__/
+*.pyc
+data.json
+user.json
