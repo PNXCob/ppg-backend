@@ -1,0 +1,6 @@
+numpy==1.23.5
+scipy==1.9.3
+PyWavelets==1.4.1
+tensorflow-cpu==2.11.0
+wfdb
+sockets
