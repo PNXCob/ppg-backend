@@ -1,4 +1,4 @@
-// server.js – Optimized Version: UDP + WebSocket + Python + Clean Logs
+// server.js – Optimized Version: UDP + WebSocket + Python + Clean Logs + Fixed History Response
 
 const express = require('express');
 const cors = require('cors');
@@ -56,7 +56,7 @@ udpServer.on('message', (msg) => {
     const irArray = buffer.map(e => e.ir);
     const tsArray = buffer.map(e => e.timestamp / 1000);
 
-    buffer.length = 0; // clear buffer
+    buffer.length = 0;
     const results = {};
 
     execFile('python3', ['process/blood_pressure.py', JSON.stringify(greenArray), JSON.stringify(tsArray)], (err, stdout) => {
@@ -99,9 +99,10 @@ app.get('/data/latest', (req, res) => {
   res.json({ success: true, data: data[data.length - 1] });
 });
 
+// ✅ FIXED: Return raw array instead of wrapped object
 app.get('/data/history', (req, res) => {
   const raw = fs.readFileSync(dataFile);
-  res.json({ success: true, data: JSON.parse(raw) });
+  res.json(JSON.parse(raw)); // Just return the array
 });
 
 app.post('/user', (req, res) => {
@@ -121,7 +122,6 @@ app.post('/user/reset', (req, res) => {
   res.json({ success: true, message: 'User reset.' });
 });
 
-// === Start Express Server ===
 app.listen(PORT, () => {
   console.log(`HTTP API running on http://localhost:${PORT}`);
 });
