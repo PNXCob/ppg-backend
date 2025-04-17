@@ -1,4 +1,4 @@
-// server.js – Final Version: Combined UDP + Python Processing + WebSocket + Storage
+// server.js – Optimized Version: UDP + WebSocket + Python + Clean Logs
 
 const express = require('express');
 const cors = require('cors');
@@ -22,9 +22,10 @@ const userFile = path.join(__dirname, 'user.json');
 if (!fs.existsSync(dataFile)) fs.writeFileSync(dataFile, JSON.stringify([]));
 if (!fs.existsSync(userFile)) fs.writeFileSync(userFile, JSON.stringify(null));
 
-// ========== WebSocket Setup ==========
+// === WebSocket Server ===
 const wss = new WebSocket.Server({ port: WS_PORT });
-console.log(`🔌 WebSocket running on ws://localhost:${WS_PORT}`);
+console.log(`WebSocket ready on ws://localhost:${WS_PORT}`);
+
 function broadcast(data) {
   const json = JSON.stringify(data);
   wss.clients.forEach(client => {
@@ -32,11 +33,10 @@ function broadcast(data) {
   });
 }
 
-// ========== UDP Listener ==========
+// === UDP Setup ===
 const udpServer = dgram.createSocket('udp4');
-
-let buffer = [];
-const SAMPLE_RATE = 50; // Hz
+const buffer = [];
+const SAMPLE_RATE = 50;
 const WINDOW_SECONDS = 10;
 const MAX_SAMPLES = SAMPLE_RATE * WINDOW_SECONDS;
 
@@ -56,40 +56,30 @@ udpServer.on('message', (msg) => {
     const irArray = buffer.map(e => e.ir);
     const tsArray = buffer.map(e => e.timestamp / 1000);
 
-    // Reset buffer for next window
-    buffer = [];
-
+    buffer.length = 0; // clear buffer
     const results = {};
 
-    // --- 1. BP (Green) ---
     execFile('python3', ['process/blood_pressure.py', JSON.stringify(greenArray), JSON.stringify(tsArray)], (err, stdout) => {
       if (!err) results.bp = JSON.parse(stdout);
 
-      // --- 2. HR (Green) ---
       execFile('python3', ['process/heartrate.py', JSON.stringify(greenArray), JSON.stringify(tsArray)], (err, stdout) => {
         if (!err) results.hr = JSON.parse(stdout);
 
-        // --- 3. RR (Green) ---
         execFile('python3', ['process/respiratory_rate.py', JSON.stringify(greenArray), JSON.stringify(tsArray)], (err, stdout) => {
           if (!err) results.rr = JSON.parse(stdout);
 
-          // --- 4. SpO2 (Red + IR) ---
           execFile('python3', ['process/spo2.py', JSON.stringify(redArray), JSON.stringify(irArray), JSON.stringify(tsArray)], (err, stdout) => {
             if (!err) results.spo2 = JSON.parse(stdout);
 
-            // Add final timestamp
             results.timestamp = new Date().toISOString();
 
-            // Save to data.json
             const raw = fs.readFileSync(dataFile);
             const data = JSON.parse(raw);
             data.push(results);
             fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
 
-            // Broadcast via WebSocket
             broadcast(results);
-
-            console.log('📡 Data sent to Flutter app:', results);
+            console.log(`[WS] Sent vitals @ ${results.timestamp}`);
           });
         });
       });
@@ -98,14 +88,14 @@ udpServer.on('message', (msg) => {
 });
 
 udpServer.bind(UDP_PORT, () => {
-  console.log(`✅ UDP Server listening on port ${UDP_PORT}`);
+  console.log(`UDP listening on port ${UDP_PORT}`);
 });
 
-// ========== API Routes (Optional for Summary/History/Profile) ==========
+// === API Routes ===
 app.get('/data/latest', (req, res) => {
   const raw = fs.readFileSync(dataFile);
   const data = JSON.parse(raw);
-  if (data.length === 0) return res.status(404).json({ success: false, message: 'No sensor data.' });
+  if (data.length === 0) return res.status(404).json({ success: false, message: 'No data.' });
   res.json({ success: true, data: data[data.length - 1] });
 });
 
@@ -128,10 +118,10 @@ app.get('/user', (req, res) => {
 
 app.post('/user/reset', (req, res) => {
   fs.writeFileSync(userFile, JSON.stringify(null));
-  res.json({ success: true, message: 'User reset' });
+  res.json({ success: true, message: 'User reset.' });
 });
 
-// ========== Launch Server ==========
+// === Start Express Server ===
 app.listen(PORT, () => {
-  console.log(`🚀 PPG Server running at http://localhost:${PORT}`);
+  console.log(`HTTP API running on http://localhost:${PORT}`);
 });
