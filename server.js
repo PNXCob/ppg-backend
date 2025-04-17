@@ -1,5 +1,3 @@
-// server.js – Optimized Version: UDP + WebSocket + Python + Clean Logs + Fixed History Response
-
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -19,6 +17,7 @@ app.use(bodyParser.json());
 
 const dataFile = path.join(__dirname, 'data.json');
 const userFile = path.join(__dirname, 'user.json');
+
 if (!fs.existsSync(dataFile)) fs.writeFileSync(dataFile, JSON.stringify([]));
 if (!fs.existsSync(userFile)) fs.writeFileSync(userFile, JSON.stringify(null));
 
@@ -41,20 +40,22 @@ const WINDOW_SECONDS = 10;
 const MAX_SAMPLES = SAMPLE_RATE * WINDOW_SECONDS;
 
 udpServer.on('message', (msg) => {
-  if (msg.length !== 16) return;
+  if (msg.length !== 20) return; // ✅ Expecting 20 bytes now
 
   const green = msg.readInt32LE(0);
   const red = msg.readInt32LE(4);
   const ir = msg.readInt32LE(8);
   const timestamp = msg.readUInt32LE(12);
+  const temp = msg.readFloatLE(16); // ✅ New: temperature in °C
 
-  buffer.push({ green, red, ir, timestamp });
+  buffer.push({ green, red, ir, timestamp, temp });
 
   if (buffer.length >= MAX_SAMPLES) {
     const greenArray = buffer.map(e => e.green);
     const redArray = buffer.map(e => e.red);
     const irArray = buffer.map(e => e.ir);
     const tsArray = buffer.map(e => e.timestamp / 1000);
+    const tempArray = buffer.map(e => e.temp);
 
     buffer.length = 0;
     const results = {};
@@ -70,6 +71,10 @@ udpServer.on('message', (msg) => {
 
           execFile('python3', ['process/spo2.py', JSON.stringify(redArray), JSON.stringify(irArray), JSON.stringify(tsArray)], (err, stdout) => {
             if (!err) results.spo2 = JSON.parse(stdout);
+
+            // ✅ Include averaged temperature
+            const averageTemp = tempArray.reduce((a, b) => a + b, 0) / tempArray.length;
+            results.temp = Number(averageTemp.toFixed(1));  // Rounded to 1 decimal
 
             results.timestamp = new Date().toISOString();
 
@@ -99,10 +104,9 @@ app.get('/data/latest', (req, res) => {
   res.json({ success: true, data: data[data.length - 1] });
 });
 
-// ✅ FIXED: Return raw array instead of wrapped object
 app.get('/data/history', (req, res) => {
   const raw = fs.readFileSync(dataFile);
-  res.json(JSON.parse(raw)); // Just return the array
+  res.json(JSON.parse(raw)); // ✅ Return raw array
 });
 
 app.post('/user', (req, res) => {
