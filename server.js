@@ -1,4 +1,4 @@
-// === All Imports ===
+// ... keep all previous imports
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -28,24 +28,6 @@ console.log(`WebSocket ready on ws://localhost:${WS_PORT}`);
 wss.on('connection', (ws) => {
   console.log("📡 Client connected");
 
-  // ✅ Mock data broadcast every 5 seconds (for testing without device)
-  const mockInterval = setInterval(() => {
-    const fakeVitals = {
-      bp: { systolic: 120, diastolic: 80 },
-      hr: { bpm: 75 },
-      rr: { value: 18 },
-      spo2: { value: 98 },
-      temp: 36.8,
-      timestamp: new Date().toISOString()
-    };
-    try {
-      ws.send(JSON.stringify(fakeVitals));
-    } catch (e) {
-      console.log("❌ Failed to send mock vitals:", e);
-      clearInterval(mockInterval);
-    }
-  }, 5000);
-
   ws.on('message', (msg) => {
     try {
       const parsed = JSON.parse(msg);
@@ -59,12 +41,10 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log("⚠️ Client disconnected");
-    clearInterval(mockInterval); // 🛑 Stop mock when client disconnects
   });
 
   ws.on('error', (err) => {
     console.error("❌ WebSocket server error:", err);
-    clearInterval(mockInterval);
   });
 });
 
