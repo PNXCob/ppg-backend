@@ -25,6 +25,9 @@ if (!fs.existsSync(userFile)) fs.writeFileSync(userFile, JSON.stringify(null));
 const wss = new WebSocket.Server({ port: WS_PORT });
 console.log(`WebSocket ready on ws://localhost:${WS_PORT}`);
 
+let lastUDPTime = Date.now();
+let fallbackSent = false;
+
 wss.on('connection', (ws) => {
   console.log("📡 Client connected");
 
@@ -55,6 +58,20 @@ function broadcast(data) {
   });
 }
 
+function broadcastFallback() {
+  if (!fallbackSent && Date.now() - lastUDPTime > 15000) {
+    const raw = fs.readFileSync(dataFile);
+    const data = JSON.parse(raw);
+    if (data.length > 0) {
+      console.log("📭 No incoming UDP. Broadcasting last known data.");
+      broadcast(data[data.length - 1]);
+      fallbackSent = true;
+    }
+  }
+}
+
+setInterval(broadcastFallback, 5000);
+
 // === UDP Setup ===
 const udpServer = dgram.createSocket('udp4');
 const buffer = [];
@@ -69,9 +86,11 @@ udpServer.on('message', (msg) => {
   const red = msg.readInt32LE(4);
   const ir = msg.readInt32LE(8);
   const timestamp = msg.readUInt32LE(12);
-  const temp = msg.readFloatLE(16); // ✅ Float (4 bytes) for temperature
+  const temp = msg.readFloatLE(16);
 
   buffer.push({ green, red, ir, timestamp, temp });
+  lastUDPTime = Date.now();
+  fallbackSent = false;
 
   if (buffer.length >= MAX_SAMPLES) {
     const greenArray = buffer.map(e => e.green);
