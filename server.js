@@ -1,4 +1,3 @@
-// ... keep all previous imports
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -21,7 +20,6 @@ const userFile = path.join(__dirname, 'user.json');
 if (!fs.existsSync(dataFile)) fs.writeFileSync(dataFile, JSON.stringify([]));
 if (!fs.existsSync(userFile)) fs.writeFileSync(userFile, JSON.stringify(null));
 
-// === WebSocket Server ===
 const wss = new WebSocket.Server({ port: WS_PORT });
 console.log(`WebSocket ready on ws://localhost:${WS_PORT}`);
 
@@ -59,12 +57,14 @@ function broadcast(data) {
 }
 
 function broadcastFallback() {
-  if (!fallbackSent && Date.now() - lastUDPTime > 15000) {
+  const now = Date.now();
+  if (!fallbackSent && now - lastUDPTime > 15000) {
     const raw = fs.readFileSync(dataFile);
     const data = JSON.parse(raw);
     if (data.length > 0) {
-      console.log("📭 No incoming UDP. Broadcasting last known data.");
-      broadcast(data[data.length - 1]);
+      const lastData = data[data.length - 1];
+      console.log("📭 No incoming UDP. Broadcasting last known data as fallback.");
+      broadcast(lastData);
       fallbackSent = true;
     }
   }
