@@ -1,3 +1,4 @@
+// ... keep all previous imports
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -17,13 +18,35 @@ app.use(bodyParser.json());
 
 const dataFile = path.join(__dirname, 'data.json');
 const userFile = path.join(__dirname, 'user.json');
-
 if (!fs.existsSync(dataFile)) fs.writeFileSync(dataFile, JSON.stringify([]));
 if (!fs.existsSync(userFile)) fs.writeFileSync(userFile, JSON.stringify(null));
 
 // === WebSocket Server ===
 const wss = new WebSocket.Server({ port: WS_PORT });
 console.log(`WebSocket ready on ws://localhost:${WS_PORT}`);
+
+wss.on('connection', (ws) => {
+  console.log("📡 Client connected");
+
+  ws.on('message', (msg) => {
+    try {
+      const parsed = JSON.parse(msg);
+      if (parsed.type === 'ping') {
+        console.log("📶 Ping received from client at", new Date().toISOString());
+      }
+    } catch (e) {
+      console.log("📥 Raw message received:", msg);
+    }
+  });
+
+  ws.on('close', () => {
+    console.log("⚠️ Client disconnected");
+  });
+
+  ws.on('error', (err) => {
+    console.error("❌ WebSocket server error:", err);
+  });
+});
 
 function broadcast(data) {
   const json = JSON.stringify(data);
@@ -40,13 +63,13 @@ const WINDOW_SECONDS = 10;
 const MAX_SAMPLES = SAMPLE_RATE * WINDOW_SECONDS;
 
 udpServer.on('message', (msg) => {
-  if (msg.length !== 20) return; // ✅ Expecting 20 bytes now
+  if (msg.length !== 20) return;
 
   const green = msg.readInt32LE(0);
   const red = msg.readInt32LE(4);
   const ir = msg.readInt32LE(8);
   const timestamp = msg.readUInt32LE(12);
-  const temp = msg.readFloatLE(16); // ✅ New: temperature in °C
+  const temp = msg.readFloatLE(16); // ✅ Float (4 bytes) for temperature
 
   buffer.push({ green, red, ir, timestamp, temp });
 
@@ -55,7 +78,7 @@ udpServer.on('message', (msg) => {
     const redArray = buffer.map(e => e.red);
     const irArray = buffer.map(e => e.ir);
     const tsArray = buffer.map(e => e.timestamp / 1000);
-    const tempArray = buffer.map(e => e.temp);
+    const latestTemp = buffer[buffer.length - 1].temp.toFixed(1);
 
     buffer.length = 0;
     const results = {};
@@ -72,11 +95,8 @@ udpServer.on('message', (msg) => {
           execFile('python3', ['process/spo2.py', JSON.stringify(redArray), JSON.stringify(irArray), JSON.stringify(tsArray)], (err, stdout) => {
             if (!err) results.spo2 = JSON.parse(stdout);
 
-            // ✅ Include averaged temperature
-            const averageTemp = tempArray.reduce((a, b) => a + b, 0) / tempArray.length;
-            results.temp = Number(averageTemp.toFixed(1));  // Rounded to 1 decimal
-
             results.timestamp = new Date().toISOString();
+            results.temp = parseFloat(latestTemp);
 
             const raw = fs.readFileSync(dataFile);
             const data = JSON.parse(raw);
@@ -106,7 +126,7 @@ app.get('/data/latest', (req, res) => {
 
 app.get('/data/history', (req, res) => {
   const raw = fs.readFileSync(dataFile);
-  res.json(JSON.parse(raw)); // ✅ Return raw array
+  res.json(JSON.parse(raw));
 });
 
 app.post('/user', (req, res) => {
