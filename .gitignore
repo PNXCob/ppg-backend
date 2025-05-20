@@ -1,0 +1,27 @@
+# Node modules
+node_modules/
+
+# Python environment folders
+biomnitrix-env/
+.venv/
+
+# Environment config files
+.env
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+
+# Data files
+data.json
+user.json
+
+# Ignore all models in process/models folder
+process/models/*.h5
+
+# Ignore binaries and libraries
+*.dll
+*.lib
+*.pyd
+*.exe
+*.so
